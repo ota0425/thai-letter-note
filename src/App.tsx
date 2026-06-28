@@ -157,10 +157,6 @@ function getDisplayCharacter(item: ThaiLearningItem) {
 }
 
 function getPatternCharacter(item: ThaiLearningItem) {
-  if (item.type === "vowel" && item.character.includes("-")) {
-    return item.character.replace("-", "◌");
-  }
-
   return item.character;
 }
 
@@ -708,9 +704,7 @@ export default function App() {
                         onClick={() => openCard(item)}
                       >
                         <span className="overview-letter">
-                          {item.type === "vowel"
-                            ? getPatternCharacter(item)
-                            : getDisplayCharacter(item)}
+                          {getDisplayCharacter(item)}
                         </span>
                         <span className="overview-reading">
                           {item.romanization}
