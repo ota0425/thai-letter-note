@@ -1,0 +1,18 @@
+{
+  "name": "タイ文字ノート",
+  "short_name": "タイ文字",
+  "description": "タイ文字を分類ごとに覚える学習アプリ",
+  "start_url": "/thai-letter-note/",
+  "scope": "/thai-letter-note/",
+  "display": "standalone",
+  "background_color": "#f5f3ef",
+  "theme_color": "#213f50",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

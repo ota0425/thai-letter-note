@@ -17,7 +17,7 @@ import type {
   ThaiLearningItem,
 } from "./types";
 
-type ViewMode = "cards" | "quiz" | "overview" | "progress";
+type ViewMode = "cards" | "quiz" | "review" | "weak" | "overview" | "progress";
 type FilterMode = "all" | "consonants" | "vowels" | ConsonantClass;
 
 type OverviewGroup = {
@@ -183,6 +183,42 @@ function getTotalIncorrect(progress: Progress) {
   );
 }
 
+function getCorrectCount(progress: Progress, itemId: string) {
+  return progress.correctCountByCharacterId[itemId] ?? 0;
+}
+
+function getIncorrectCount(progress: Progress, itemId: string) {
+  return progress.incorrectCountByCharacterId[itemId] ?? 0;
+}
+
+function getWeakScore(progress: Progress, item: ThaiLearningItem) {
+  return getIncorrectCount(progress, item.id) - getCorrectCount(progress, item.id);
+}
+
+function getWeakItems(progress: Progress) {
+  return thaiCharacters
+    .filter((item) => getWeakScore(progress, item) > 0)
+    .sort((a, b) => getWeakScore(progress, b) - getWeakScore(progress, a));
+}
+
+function getReviewItems(progress: Progress) {
+  return [...thaiCharacters].sort((a, b) => {
+    const aWeakScore = getWeakScore(progress, a);
+    const bWeakScore = getWeakScore(progress, b);
+    const aUnseen = progress.seenCharacterIds.includes(a.id) ? 0 : 1;
+    const bUnseen = progress.seenCharacterIds.includes(b.id) ? 0 : 1;
+    const aIncorrect = getIncorrectCount(progress, a.id);
+    const bIncorrect = getIncorrectCount(progress, b.id);
+
+    return (
+      bWeakScore - aWeakScore ||
+      bUnseen - aUnseen ||
+      bIncorrect - aIncorrect ||
+      thaiCharacters.indexOf(a) - thaiCharacters.indexOf(b)
+    );
+  });
+}
+
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
@@ -208,6 +244,11 @@ export default function App() {
       return item.type === "consonant" && item.consonantClass === filterMode;
     });
   }, [filterMode]);
+
+  const weakCharacters = useMemo(() => getWeakItems(progress), [progress]);
+  const reviewCharacters = useMemo(() => getReviewItems(progress), [progress]);
+  const activeCharacters =
+    viewMode === "review" ? reviewCharacters : visibleCharacters;
 
   const overviewGroups = useMemo<OverviewGroup[]>(() => {
     const consonants = thaiCharacters.filter((item) => item.type === "consonant");
@@ -266,7 +307,7 @@ export default function App() {
     ];
   }, []);
 
-  const currentCharacter = visibleCharacters[selectedIndex] ?? thaiCharacters[0];
+  const currentCharacter = activeCharacters[selectedIndex] ?? activeCharacters[0] ?? thaiCharacters[0];
   const quizChoices = useMemo(
     () => buildChoices(currentCharacter, quizMode),
     [currentCharacter, quizMode],
@@ -280,6 +321,8 @@ export default function App() {
   const seenCount = progress.seenCharacterIds.length;
   const totalCorrect = getTotalCorrect(progress);
   const totalIncorrect = getTotalIncorrect(progress);
+  const weakCount = weakCharacters.length;
+  const isReviewMode = viewMode === "review";
 
   useEffect(() => {
     saveProgress(progress);
@@ -288,7 +331,7 @@ export default function App() {
   useEffect(() => {
     setSelectedIndex(0);
     setSelectedAnswer(null);
-  }, [filterMode]);
+  }, [filterMode, viewMode]);
 
   useEffect(() => {
     setSelectedAnswer(null);
@@ -310,7 +353,7 @@ export default function App() {
   function goNext() {
     markSeen(currentCharacter.id);
     setSelectedIndex((currentIndex) =>
-      getNextIndex(currentIndex, visibleCharacters.length),
+      getNextIndex(currentIndex, activeCharacters.length),
     );
   }
 
@@ -366,6 +409,16 @@ export default function App() {
     }
   }
 
+  function startReview(item?: ThaiLearningItem) {
+    const targetIndex = item
+      ? reviewCharacters.findIndex((candidate) => candidate.id === item.id)
+      : 0;
+
+    setViewMode("review");
+    setSelectedIndex(targetIndex >= 0 ? targetIndex : 0);
+    setSelectedAnswer(null);
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -395,6 +448,20 @@ export default function App() {
           クイズ
         </button>
         <button
+          className={viewMode === "review" ? "active" : ""}
+          type="button"
+          onClick={() => startReview()}
+        >
+          復習
+        </button>
+        <button
+          className={viewMode === "weak" ? "active" : ""}
+          type="button"
+          onClick={() => setViewMode("weak")}
+        >
+          苦手
+        </button>
+        <button
           className={viewMode === "overview" ? "active" : ""}
           type="button"
           onClick={() => setViewMode("overview")}
@@ -410,7 +477,7 @@ export default function App() {
         </button>
       </nav>
 
-      {viewMode !== "overview" && (
+      {(viewMode === "cards" || viewMode === "quiz") && (
         <section className="filter-bar" aria-label="学習項目フィルター">
           {classOptions.map((option) => (
             <button
@@ -466,11 +533,11 @@ export default function App() {
         </section>
       )}
 
-      {viewMode === "quiz" && (
+      {(viewMode === "quiz" || viewMode === "review") && (
         <section className="study-panel" aria-labelledby="quiz-title">
           <div className="quiz-header">
             <div>
-              <p className="eyebrow">4択クイズ</p>
+              <p className="eyebrow">{isReviewMode ? "Review" : "4択クイズ"}</p>
               <h2 id="quiz-title">{currentDisplayCharacter}</h2>
             </div>
             <div className="segmented-control" aria-label="クイズ種類">
@@ -488,6 +555,11 @@ export default function App() {
           </div>
 
           <p className="quiz-prompt">
+            {isReviewMode && (
+              <span className="review-status">
+                復習 {selectedIndex + 1} / {reviewCharacters.length}
+              </span>
+            )}
             {quizMode === "romanization"
               ? "この文字・記号の独自ローマ字表記は？"
               : "この文字・記号の分類は？"}
@@ -548,6 +620,52 @@ export default function App() {
               <button className="primary" type="button" onClick={goNext}>
                 次へ
               </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {viewMode === "weak" && (
+        <section className="study-panel" aria-labelledby="weak-title">
+          <div className="progress-summary">
+            <div>
+              <p className="eyebrow">Weak Points</p>
+              <h2 id="weak-title">苦手リスト</h2>
+            </div>
+            <button className="primary" type="button" onClick={() => startReview()}>
+              復習する
+            </button>
+          </div>
+
+          {weakCharacters.length === 0 ? (
+            <div className="empty-panel">
+              <strong>苦手な文字はまだありません</strong>
+              <p>クイズで間違えた文字がここに表示されます。</p>
+            </div>
+          ) : (
+            <div className="progress-list weak-list">
+              {weakCharacters.map((item) => {
+                const correctCount = getCorrectCount(progress, item.id);
+                const incorrectCount = getIncorrectCount(progress, item.id);
+
+                return (
+                  <div className="progress-item weak-item" key={item.id}>
+                    <span className="mini-letter">{getDisplayCharacter(item)}</span>
+                    <div>
+                      <strong>{item.romanization}</strong>
+                      <p>
+                        {getItemTypeLabel(item)} / {getCategoryLabel(item)}
+                      </p>
+                    </div>
+                    <span className="weak-score">
+                      {correctCount} / {incorrectCount}
+                    </span>
+                    <button type="button" onClick={() => startReview(item)}>
+                      復習
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
@@ -626,6 +744,10 @@ export default function App() {
             <div>
               <span>{totalIncorrect}</span>
               <p>不正解</p>
+            </div>
+            <div>
+              <span>{weakCount}</span>
+              <p>苦手</p>
             </div>
           </div>
 
