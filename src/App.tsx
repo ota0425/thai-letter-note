@@ -153,11 +153,15 @@ function getAnswer(item: ThaiLearningItem, mode: QuizMode) {
 }
 
 function getDisplayCharacter(item: ThaiLearningItem) {
+  return item.displayCharacter ?? item.character;
+}
+
+function getPatternCharacter(item: ThaiLearningItem) {
   if (item.type === "vowel" && item.character.includes("-")) {
-    return item.character.replace("-", "□");
+    return item.character.replace("-", "◌");
   }
 
-  return item.displayCharacter ?? item.character;
+  return item.character;
 }
 
 function sortConsonants(
@@ -507,7 +511,7 @@ export default function App() {
               <span>{currentTypeLabel}</span>
               <span>{currentCategoryLabel}</span>
               {currentCharacter.displayCharacter && (
-                <span>記号 {currentCharacter.character}</span>
+                <span>記号 {getPatternCharacter(currentCharacter)}</span>
               )}
               <span>{currentCharacter.romanization}</span>
               {currentCharacter.ipa && <span>IPA {currentCharacter.ipa}</span>}
@@ -704,7 +708,9 @@ export default function App() {
                         onClick={() => openCard(item)}
                       >
                         <span className="overview-letter">
-                          {getDisplayCharacter(item)}
+                          {item.type === "vowel"
+                            ? getPatternCharacter(item)
+                            : getDisplayCharacter(item)}
                         </span>
                         <span className="overview-reading">
                           {item.romanization}

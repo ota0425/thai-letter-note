@@ -417,6 +417,7 @@ button.primary {
 
 .overview-cell.vowel-cell {
   min-height: 68px;
+  padding-block: 0.45rem;
 }
 
 .overview-cell.learned {
@@ -439,6 +440,8 @@ button.primary {
 
 .vowel-cell .overview-letter {
   font-size: clamp(1rem, 4.8vw, 1.45rem);
+  line-height: 1.35;
+  overflow: visible;
 }
 
 .overview-reading {
