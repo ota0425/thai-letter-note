@@ -4,6 +4,7 @@ import {
   thaiCharacters,
   vowelLengthLabels,
 } from "./data/thaiCharacters";
+import { thaiWords } from "./data/thaiWords";
 import {
   emptyProgress,
   loadProgress,
@@ -15,9 +16,17 @@ import type {
   Progress,
   QuizMode,
   ThaiLearningItem,
+  ThaiWord,
 } from "./types";
 
-type ViewMode = "cards" | "quiz" | "review" | "weak" | "overview" | "progress";
+type ViewMode =
+  | "cards"
+  | "quiz"
+  | "review"
+  | "words"
+  | "weak"
+  | "overview"
+  | "progress";
 type FilterMode = "all" | "consonants" | "vowels" | ConsonantClass;
 
 type OverviewGroup = {
@@ -138,6 +147,19 @@ function buildChoices(
   );
 }
 
+function buildWordChoices(current: ThaiWord): string[] {
+  const correct = current.romanization;
+  const currentIndex = thaiWords.findIndex((word) => word.id === current.id);
+  const pool = thaiWords.filter((word) => word.romanization !== correct);
+  const distractors = [1, 2, 3]
+    .map((offset) => pool[(currentIndex + offset) % pool.length]?.romanization)
+    .filter(Boolean);
+
+  return uniqueItems([correct, ...distractors]).sort((a, b) =>
+    a.localeCompare(b),
+  );
+}
+
 function getCategoryLabel(item: ThaiLearningItem) {
   return item.type === "consonant"
     ? consonantClassLabels[item.consonantClass]
@@ -191,6 +213,14 @@ function getIncorrectCount(progress: Progress, itemId: string) {
   return progress.incorrectCountByCharacterId[itemId] ?? 0;
 }
 
+function getWordCorrectCount(progress: Progress, wordId: string) {
+  return progress.wordCorrectCountById[wordId] ?? 0;
+}
+
+function getWordIncorrectCount(progress: Progress, wordId: string) {
+  return progress.wordIncorrectCountById[wordId] ?? 0;
+}
+
 function getWeakScore(progress: Progress, item: ThaiLearningItem) {
   return getIncorrectCount(progress, item.id) - getCorrectCount(progress, item.id);
 }
@@ -217,6 +247,20 @@ function getReviewItems(progress: Progress) {
       thaiCharacters.indexOf(a) - thaiCharacters.indexOf(b)
     );
   });
+}
+
+function getTotalWordCorrect(progress: Progress) {
+  return Object.values(progress.wordCorrectCountById).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+}
+
+function getTotalWordIncorrect(progress: Progress) {
+  return Object.values(progress.wordIncorrectCountById).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
 }
 
 export default function App() {
@@ -308,19 +352,28 @@ export default function App() {
   }, []);
 
   const currentCharacter = activeCharacters[selectedIndex] ?? activeCharacters[0] ?? thaiCharacters[0];
+  const currentWord = thaiWords[selectedIndex] ?? thaiWords[0];
   const quizChoices = useMemo(
     () => buildChoices(currentCharacter, quizMode),
     [currentCharacter, quizMode],
   );
+  const wordChoices = useMemo(
+    () => buildWordChoices(currentWord),
+    [currentWord],
+  );
   const correctAnswer = getAnswer(currentCharacter, quizMode);
+  const correctWordAnswer = currentWord.romanization;
   const currentCategoryLabel = getCategoryLabel(currentCharacter);
   const currentTypeLabel = getItemTypeLabel(currentCharacter);
   const currentDisplayCharacter = getDisplayCharacter(currentCharacter);
   const isCorrect = selectedAnswer === correctAnswer;
+  const isWordCorrect = selectedAnswer === correctWordAnswer;
   const isCurrentSeen = progress.seenCharacterIds.includes(currentCharacter.id);
   const seenCount = progress.seenCharacterIds.length;
   const totalCorrect = getTotalCorrect(progress);
   const totalIncorrect = getTotalIncorrect(progress);
+  const totalWordCorrect = getTotalWordCorrect(progress);
+  const totalWordIncorrect = getTotalWordIncorrect(progress);
   const weakCount = weakCharacters.length;
   const isReviewMode = viewMode === "review";
 
@@ -392,6 +445,42 @@ export default function App() {
     });
   }
 
+  function goNextWord() {
+    setSelectedIndex((currentIndex) =>
+      getNextIndex(currentIndex, thaiWords.length),
+    );
+  }
+
+  function answerWord(answer: string) {
+    if (selectedAnswer) {
+      return;
+    }
+
+    const answeredCorrectly = answer === correctWordAnswer;
+    setSelectedAnswer(answer);
+    setProgress((currentProgress) => {
+      const targetMap = answeredCorrectly
+        ? currentProgress.wordCorrectCountById
+        : currentProgress.wordIncorrectCountById;
+
+      return {
+        ...currentProgress,
+        wordCorrectCountById: answeredCorrectly
+          ? {
+              ...targetMap,
+              [currentWord.id]: (targetMap[currentWord.id] ?? 0) + 1,
+            }
+          : currentProgress.wordCorrectCountById,
+        wordIncorrectCountById: answeredCorrectly
+          ? currentProgress.wordIncorrectCountById
+          : {
+              ...targetMap,
+              [currentWord.id]: (targetMap[currentWord.id] ?? 0) + 1,
+            },
+      };
+    });
+  }
+
   function resetProgress() {
     window.localStorage.removeItem(progressStorageKey);
     setProgress(emptyProgress);
@@ -453,6 +542,13 @@ export default function App() {
           onClick={() => startReview()}
         >
           復習
+        </button>
+        <button
+          className={viewMode === "words" ? "active" : ""}
+          type="button"
+          onClick={() => setViewMode("words")}
+        >
+          単語
         </button>
         <button
           className={viewMode === "weak" ? "active" : ""}
@@ -625,6 +721,83 @@ export default function App() {
         </section>
       )}
 
+      {viewMode === "words" && (
+        <section className="study-panel word-panel" aria-labelledby="word-title">
+          <div className="quiz-header">
+            <div>
+              <p className="eyebrow">Word Test</p>
+              <h2 id="word-title">{currentWord.word}</h2>
+            </div>
+            <span className="review-status">
+              単語 {selectedIndex + 1} / {thaiWords.length}
+            </span>
+          </div>
+
+          <p className="quiz-prompt">
+            この単語の読みは？ <span className="tone-note">声調はまだ判定しません</span>
+          </p>
+
+          <div className="choice-grid">
+            {wordChoices.map((choice) => {
+              const wasSelected = selectedAnswer === choice;
+              const revealCorrect = selectedAnswer && choice === correctWordAnswer;
+              return (
+                <button
+                  className={[
+                    "choice-button",
+                    wasSelected ? "selected" : "",
+                    revealCorrect ? "correct" : "",
+                    wasSelected && !isWordCorrect ? "incorrect" : "",
+                  ].join(" ")}
+                  disabled={Boolean(selectedAnswer)}
+                  key={choice}
+                  type="button"
+                  onClick={() => answerWord(choice)}
+                >
+                  {choice}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedAnswer && (
+            <div className={isWordCorrect ? "result correct" : "result incorrect"}>
+              <strong>{isWordCorrect ? "正解です" : "もう一度確認しましょう"}</strong>
+              <div className="answer-details word-answer-details">
+                <span>
+                  <small>読み</small>
+                  {currentWord.romanization}
+                </span>
+                <span>
+                  <small>意味</small>
+                  {currentWord.meaning}
+                </span>
+              </div>
+              {currentWord.notes && <p className="word-note">{currentWord.notes}</p>}
+              <button className="primary next-question-button" type="button" onClick={goNextWord}>
+                次へ
+              </button>
+              <div className="result-actions">
+                <button type="button" onClick={() => setSelectedAnswer(null)}>
+                  もう一問
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!selectedAnswer && (
+            <div className="action-row">
+              <button type="button" onClick={goNextWord}>
+                スキップ
+              </button>
+              <button className="primary" type="button" onClick={goNextWord}>
+                次へ
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       {viewMode === "weak" && (
         <section className="study-panel" aria-labelledby="weak-title">
           <div className="progress-summary">
@@ -749,8 +922,17 @@ export default function App() {
               <span>{weakCount}</span>
               <p>苦手</p>
             </div>
+            <div>
+              <span>{totalWordCorrect}</span>
+              <p>単語正解</p>
+            </div>
+            <div>
+              <span>{totalWordIncorrect}</span>
+              <p>単語不正解</p>
+            </div>
           </div>
 
+          <h3 className="progress-section-title">文字</h3>
           <div className="progress-list">
             {thaiCharacters.map((item) => (
               <div className="progress-item" key={item.id}>
@@ -767,6 +949,23 @@ export default function App() {
                 <span>
                   {(progress.correctCountByCharacterId[item.id] ?? 0)}/
                   {(progress.incorrectCountByCharacterId[item.id] ?? 0)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <h3 className="progress-section-title">単語</h3>
+          <div className="progress-list">
+            {thaiWords.map((word) => (
+              <div className="progress-item word-progress-item" key={word.id}>
+                <span className="mini-letter word-mini">{word.word}</span>
+                <div>
+                  <strong>{word.romanization}</strong>
+                  <p>{word.meaning}</p>
+                </div>
+                <span>
+                  {getWordCorrectCount(progress, word.id)}/
+                  {getWordIncorrectCount(progress, word.id)}
                 </span>
               </div>
             ))}

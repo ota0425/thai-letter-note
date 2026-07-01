@@ -6,6 +6,8 @@ export const emptyProgress: Progress = {
   seenCharacterIds: [],
   correctCountByCharacterId: {},
   incorrectCountByCharacterId: {},
+  wordCorrectCountById: {},
+  wordIncorrectCountById: {},
 };
 
 export function loadProgress(): Progress {
@@ -24,6 +26,8 @@ export function loadProgress(): Progress {
         : [],
       correctCountByCharacterId: parsed.correctCountByCharacterId ?? {},
       incorrectCountByCharacterId: parsed.incorrectCountByCharacterId ?? {},
+      wordCorrectCountById: parsed.wordCorrectCountById ?? {},
+      wordIncorrectCountById: parsed.wordIncorrectCountById ?? {},
     };
   } catch {
     return emptyProgress;

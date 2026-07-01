@@ -30,10 +30,22 @@ export type ThaiVowel = {
 export type ThaiLearningItem = ThaiConsonant | ThaiVowel;
 export type ThaiCharacter = ThaiLearningItem;
 
+export type ThaiWord = {
+  id: string;
+  word: string;
+  romanization: string;
+  ipa?: string;
+  meaning: string;
+  level: "easy" | "basic";
+  notes?: string;
+};
+
 export type Progress = {
   seenCharacterIds: string[];
   correctCountByCharacterId: Record<string, number>;
   incorrectCountByCharacterId: Record<string, number>;
+  wordCorrectCountById: Record<string, number>;
+  wordIncorrectCountById: Record<string, number>;
 };
 
 export type QuizMode = "romanization" | "class";
