@@ -7,6 +7,7 @@
 | 資料 | 内容 |
 |---|---|
 | [ASDoQによる対話評価](asdoq-dialogue-evaluation.md) | ASDoQ v2.0aに基づく、開発対話のターニングポイント別評価 |
+| [バイブコーディングによる開発手法の課題と改善提案](vibe-coding-development-improvements.md) | 対話とASDoQ評価から整理した、製品品質・教材品質・検証・変更管理の改善提案 |
 | [対話全記録](dialogue-transcript.md) | ユーザーとCodexの対話を閲覧するためのMarkdown記録 |
 | [対話記録JSONL](dialogue-transcript.jsonl) | 発話本文、日時、話者、ハッシュを保持する完全性確認用データ |
 | [ASDoQ品質モデル](ASDoQ_SystemDocumentationQualityModel_v2.0a.xlsx) | 評価に使用したASDoQ System Documentation Quality Model v2.0a |
